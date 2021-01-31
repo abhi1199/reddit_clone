@@ -1,6 +1,7 @@
 package com.example.reddit.service;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import javax.transaction.Transactional;
@@ -10,11 +11,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.example.reddit.dto.RegisterRequest;
+import com.example.reddit.exceptions.SpringRedditException;
 import com.example.reddit.model.NotificationEmail;
 import com.example.reddit.model.User;
 import com.example.reddit.model.VerificationToken;
 import com.example.reddit.repository.UserRepository;
-import com.example.reddit.repository.VerificationRepository;
+import com.example.reddit.repository.VerificationTokenRepository;
 
 @Service
 public class AuthService {
@@ -26,7 +28,7 @@ public class AuthService {
 	private UserRepository  userRepository; 
 	
 	@Autowired 
-	private VerificationRepository verificationRepository;
+	private VerificationTokenRepository verificationTokenRepository;
 	
 	@Autowired
 	private MailService mailService;
@@ -56,8 +58,26 @@ public class AuthService {
 		VerificationToken verificationToken = new VerificationToken();
 		verificationToken.setToken(token);
 		verificationToken.setUser(user);
-		verificationRepository.save(verificationToken);
+		verificationTokenRepository.save(verificationToken);
 		
 		return token;
+	}
+
+	public void verifyAccount(String token) {
+		// TODO Auto-generated method stub
+		Optional<VerificationToken> verificationToken = verificationTokenRepository.findByToken(token);
+		verificationToken.orElseThrow(()-> new SpringRedditException("Invalid Token"));
+		fetchUserAndEnable(verificationToken.get());
+		
+		
+	}
+
+	@Transactional
+	private void fetchUserAndEnable(VerificationToken verificationToken) {
+		// TODO Auto-generated method stub
+		String username = verificationToken.getUser().getUsername();
+		User user = userRepository.findByUsername(username).orElseThrow(()-> new SpringRedditException("user not found with name- "+username));
+		user.setEnabled(true);
+		userRepository.save(user);
 	}
 }
